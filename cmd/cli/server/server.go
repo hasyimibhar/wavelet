@@ -150,7 +150,7 @@ func New(cfg Config, log *logger.Logger) (*Server, error) {
 	s.db = kv
 
 	// Create a new ledger
-	s.Ledger = wavelet.NewLedger(s.db, s.Client, &s.cfg.Genesis)
+	s.Ledger = wavelet.NewLedger(s.db, s.Client)
 
 	return s, nil
 }

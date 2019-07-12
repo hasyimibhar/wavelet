@@ -4,21 +4,24 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/diamondburned/tview/v2"
 	"github.com/perlin-network/wavelet/cmd/cli/server"
 	"github.com/perlin-network/wavelet/cmd/cli/tui/logger"
 	"github.com/perlin-network/wavelet/sys"
 	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 var log *logger.Logger
+var cfg *server.Config
 
 func main() {
-	// Add the config file flag
-	var configFile string
-	flag.StringVarP(&configFile, "config", "c", "",
-		"Path to TOML config file, overrides command line arguments.")
+	/*
+		// Add the config file flag
+		var configFile string
+		flag.StringVarP(&configFile, "config", "c", "",
+			"Path to TOML config file, overrides command line arguments.")
+	*/
 
 	// promptConfigDialog when true starts the TUI with a dialog to change
 	// parameters
@@ -27,26 +30,26 @@ func main() {
 		"Start the TUI with a dialog to change parameters.")
 
 	// Add the server config flags
-	c := server.Config{}
+	cfg = &server.Config{}
 
-	flag.StringVar(&c.Host, "host", "127.0.0.1",
+	flag.StringVar(&cfg.Host, "host", "127.0.0.1",
 		"Listen for peers on host address.")
-	flag.BoolVar(&c.NAT, "nat", false,
+	flag.BoolVar(&cfg.NAT, "nat", false,
 		"Enable port forwarding, only required for PCs.")
-	flag.UintVar(&c.Port, "port", 3000,
+	flag.UintVar(&cfg.Port, "port", 3000,
 		"Listen for peers on port.")
-	flag.UintVar(&c.APIPort, "api.port", 0,
+	flag.UintVar(&cfg.APIPort, "api.port", 0,
 		"Start a local API HTTP server at this port.")
-	flag.StringVar(&c.Wallet, "wallet", "config/wallet.txt",
+	flag.StringVar(&cfg.Wallet, "wallet", "config/wallet.txt",
 		"Path to file containing hex-encoded private key. If "+
 			"the path specified is invalid, or no file exists at the "+
 			"specified path, a random wallet will be generated. "+
 			"Optionally, a 128-length hex-encoded private key to a "+
 			"wallet may also be specified.")
-	flag.StringVar(&c.Genesis, "genesis", "",
+	flag.StringVar(&cfg.Genesis, "genesis", "",
 		"Genesis JSON file contents representing initial fields of some set "+
 			"of accounts at round 0.")
-	flag.StringVar(&c.Database, "db", "",
+	flag.StringVar(&cfg.Database, "db", "",
 		"Directory path to the database. If empty, a temporary in-memory "+
 			"database will be used instead.")
 
@@ -80,34 +83,42 @@ func main() {
 	// Parse the flags
 	flag.Parse()
 
-	// Assign stuff to parse the config file if provided one
-	if configFile != "" {
-		// Bind (p)flag to Viper
-		viper.BindPFlags(flag.CommandLine)
+	/*
+		// Assign stuff to parse the config file if provided one
+		if configFile != "" {
+			// Bind (p)flag to Viper
+			viper.BindPFlags(flag.CommandLine)
 
-		// Set the config file path to the variable parsed
-		viper.SetConfigFile(configFile)
+			// Set the config file path to the variable parsed
+			viper.SetConfigFile(configFile)
 
-		if err := viper.ReadInConfig(); err != nil {
-			fatal("Failed to read config:", err)
+			if err := viper.ReadInConfig(); err != nil {
+				fatal("Failed to read config:", err)
+			}
 		}
-	}
+	*/
 
 	// Set the oddballs
 	sys.MinDifficulty = byte(*difficulty)
+
+	spew.Dump(cfg)
+	os.Exit(0)
 
 	// Make a new global logger
 	log = logger.NewLogger()
 
 	tview.Initialize()
 
+	/*
+		if promptConfigDialog {
+			tview.SetRoot(configUI())
+		} else {*/
+
+	tview.SetRoot(mainUI())
+
+	// }
+
 	// TODO(diamond): actual TUI code lmao
-	/* This to be called in the dialog callback
-	srv, err := server.New(c, log)
-	if err != nil {
-		fatal("Failed to start server", err)
-	}
-	*/
 
 	if err := tview.Run(); err != nil {
 		fatal(err)
@@ -117,6 +128,28 @@ func main() {
 func fatal(i ...interface{}) {
 	fmt.Fprintln(os.Stderr, i...)
 	os.Exit(1)
+}
+
+/*
+func configUI() tview.Primitive {
+	form := tview.NewForm()
+	form.AddInputField()
+	return nil
+}
+*/
+
+func mainUI() tview.Primitive {
+	srv, err := server.New(*cfg, log)
+	if err != nil {
+		fatal("Failed to start server", err)
+	}
+
+	go srv.Start()
+
+	flex := tview.NewFlex()
+	flex.AddItem(log, 0, 1, false)
+
+	return flex
 }
 
 /*
