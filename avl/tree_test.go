@@ -68,6 +68,35 @@ func TestTree_Commit(t *testing.T) {
 	}
 }
 
+func TestTree_Delete(t *testing.T) {
+	kv, cleanup := GetKV("level", "db")
+	defer cleanup()
+
+	{
+		tree := New(kv)
+		tree.Insert([]byte("key"), []byte("value"))
+		tree.Insert([]byte("foo"), []byte("bar"))
+		assert.NoError(t, tree.Commit())
+	}
+
+	{
+		tree := New(kv)
+		assert.True(t, tree.Delete([]byte("foo")))
+		assert.NoError(t, tree.Commit())
+	}
+
+	{
+		tree := New(kv)
+
+		val, ok := tree.Lookup([]byte("key"))
+		assert.True(t, ok)
+		assert.EqualValues(t, val, []byte("value"))
+
+		_, ok = tree.Lookup([]byte("foo"))
+		assert.False(t, ok)
+	}
+}
+
 func TestTree_DeleteUntilEmpty(t *testing.T) {
 	kv, cleanup := GetKV("level", "db")
 	defer cleanup()
