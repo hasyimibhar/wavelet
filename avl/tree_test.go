@@ -336,6 +336,32 @@ func TestTree_Difference(t *testing.T) {
 	assert.True(t, len2 > len3)
 }
 
+func TestTree_Iterate(t *testing.T) {
+	tree := New(store.NewInmem())
+	for i := uint64(0); i < 50; i++ {
+		var buf [8]byte
+		binary.BigEndian.PutUint64(buf[:], i)
+		tree.Insert(buf[:], buf[:])
+	}
+	assert.NoError(t, tree.Commit())
+
+	var result []uint64
+
+	tree.Iterate(func(key, value []byte) {
+		k := binary.BigEndian.Uint64(key)
+		v := binary.BigEndian.Uint64(value)
+		assert.Equal(t, k, v)
+		result = append(result, k)
+	})
+
+	var expected []uint64
+	for i := uint64(0); i < 50; i++ {
+		expected = append(expected, i)
+	}
+
+	assert.Equal(t, result, expected)
+}
+
 func TestTree_IterateFrom(t *testing.T) {
 	tree := New(store.NewInmem())
 	for i := uint64(0); i < 50; i++ {
@@ -381,6 +407,28 @@ func TestTree_IterateFrom(t *testing.T) {
 		expected = append(expected, i)
 	}
 	assert.Equal(t, result, expected)
+}
+
+func TestTree_IteratePrefix(t *testing.T) {
+	tree := New(store.NewInmem())
+
+	values := []string{
+		"1", "foo:2", "foo:3", "4",
+		"foo:5", "6", "foo:7", "8", "9",
+		"10", "foo:11",
+	}
+
+	for _, val := range values {
+		tree.Insert([]byte(val), []byte(val))
+	}
+	assert.NoError(t, tree.Commit())
+
+	var result []string
+	tree.IteratePrefix([]byte("foo:"), func(key, value []byte) {
+		result = append(result, string(key))
+	})
+
+	assert.Equal(t, []string{"foo:11", "foo:2", "foo:3", "foo:5", "foo:7"}, result)
 }
 
 func BenchmarkAVL(b *testing.B) {
