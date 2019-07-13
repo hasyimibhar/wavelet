@@ -24,25 +24,104 @@ import (
 	"testing"
 )
 
-func TestLRU(t *testing.T) {
+func TestLRU_Read(t *testing.T) {
+	{
+		lru := newLRU(2)
+
+		lru.put([MerkleHashSize]byte{'a'}, 1)
+		lru.put([MerkleHashSize]byte{'b'}, 2)
+
+		// Make 'b' least recently used
+		assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+		assert.Equal(t, 1, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+
+		lru.put([MerkleHashSize]byte{'c'}, 3)
+
+		assert.Equal(t, 1, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+		assert.False(t, lruCheck(lru, [MerkleHashSize]byte{'b'})) // 'b' should be removed
+		assert.Equal(t, 3, lruValue(t, lru, [MerkleHashSize]byte{'c'}))
+	}
+
+	{
+		lru := newLRU(2)
+
+		lru.put([MerkleHashSize]byte{'a'}, 1)
+		lru.put([MerkleHashSize]byte{'b'}, 2)
+
+		// Make 'a' least recently used
+		assert.Equal(t, 1, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+		assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+
+		lru.put([MerkleHashSize]byte{'c'}, 3)
+
+		assert.False(t, lruCheck(lru, [MerkleHashSize]byte{'a'})) // 'a' should be removed
+		assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+		assert.Equal(t, 3, lruValue(t, lru, [MerkleHashSize]byte{'c'}))
+	}
+}
+
+func TestLRU_Write(t *testing.T) {
+	{
+		lru := newLRU(2)
+
+		lru.put([MerkleHashSize]byte{'a'}, 1)
+		lru.put([MerkleHashSize]byte{'b'}, 2)
+
+		assert.Equal(t, 1, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+		assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+
+		// Make 'b' least recently used
+		lru.put([MerkleHashSize]byte{'a'}, 5)
+
+		lru.put([MerkleHashSize]byte{'c'}, 3)
+
+		assert.Equal(t, 5, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+		assert.False(t, lruCheck(lru, [MerkleHashSize]byte{'b'})) // 'b' should be removed
+		assert.Equal(t, 3, lruValue(t, lru, [MerkleHashSize]byte{'c'}))
+	}
+
+	{
+		lru := newLRU(2)
+
+		lru.put([MerkleHashSize]byte{'a'}, 1)
+		lru.put([MerkleHashSize]byte{'b'}, 2)
+
+		assert.Equal(t, 1, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+		assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+
+		// Make 'a' least recently used
+		lru.put([MerkleHashSize]byte{'b'}, 8)
+
+		lru.put([MerkleHashSize]byte{'c'}, 3)
+
+		assert.False(t, lruCheck(lru, [MerkleHashSize]byte{'a'})) // 'a' should be removed
+		assert.Equal(t, 8, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+		assert.Equal(t, 3, lruValue(t, lru, [MerkleHashSize]byte{'c'}))
+	}
+}
+
+func TestLRU_Remove(t *testing.T) {
 	lru := newLRU(2)
 
 	lru.put([MerkleHashSize]byte{'a'}, 1)
 	lru.put([MerkleHashSize]byte{'b'}, 2)
-	_, ok := lru.load([MerkleHashSize]byte{'b'})
-	assert.True(t, ok)
-	_, ok = lru.load([MerkleHashSize]byte{'a'})
-	assert.True(t, ok)
 
-	lru.put([MerkleHashSize]byte{'c'}, 3)
-	_, ok = lru.load([MerkleHashSize]byte{'b'})
-	assert.False(t, ok)
+	assert.Equal(t, 1, lruValue(t, lru, [MerkleHashSize]byte{'a'}))
+	assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
 
-	val, ok := lru.load([MerkleHashSize]byte{'a'})
-	assert.True(t, ok)
-	assert.Equal(t, 1, val.(int))
+	lru.remove([MerkleHashSize]byte{'a'})
 
-	val, ok = lru.load([MerkleHashSize]byte{'c'})
+	assert.False(t, lruCheck(lru, [MerkleHashSize]byte{'a'})) // 'a' should be removed
+	assert.Equal(t, 2, lruValue(t, lru, [MerkleHashSize]byte{'b'}))
+}
+
+func lruCheck(lru *lru, key [MerkleHashSize]byte) bool {
+	_, ok := lru.load(key)
+	return ok
+}
+
+func lruValue(t *testing.T, lru *lru, key [MerkleHashSize]byte) interface{} {
+	val, ok := lru.load(key)
 	assert.True(t, ok)
-	assert.Equal(t, 3, val.(int))
+	return val
 }
